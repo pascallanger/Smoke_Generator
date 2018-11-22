@@ -1,6 +1,6 @@
-// ******************************************************************************
-// Smoke Generator Code by Pascal Langer
-// ******************************************************************************
+/*****************************************************************/
+/**** Smoke Generator Code by Pascal Langer for Bateau Modele ****/
+/*****************************************************************/
 
 // ***********
 //  Validate
@@ -12,11 +12,14 @@
 // ***********
 //    PINS
 // ***********
-#define CHANNEL_0_PIN	2	// PORT D.2 => Receiver input
-#define SMOKE_PIN		A0	// PORT C.0 => Smoke output
-#define SMOKE_LED_PIN	A1	// PORT C.1 => Smoke LED output
-#define LED_PIN			13	// PORT B.5 => Onboard LED
+#define CHANNEL_0_PIN	2					// PORT D.2 => Receiver input
+#define SMOKE_PIN		A0					// PORT C.0 => Smoke output
+#define SMOKE_LED_PIN	A1					// PORT C.1 => Smoke LED output
+#define LED_PIN			13					// PORT B.5 => Onboard LED
 
+// ***********
+//   MACROS
+// ***********
 //SMOKE LED
 #define SMOKE_LED_ON	(PORTC |=  (1<<PORTC1))
 #define SMOKE_LED_OFF	(PORTC &= ~(1<<PORTC1))
@@ -37,7 +40,7 @@ boolean failsafe=true;
 boolean smoke_request=false;
 
 //Channels
-volatile uint16_t Channel0_Start=0, Channel0_Value=0;
+volatile uint16_t Channel0_Value=0;
 volatile boolean Channel0_Ok=false;
 
 /****************************/
@@ -47,32 +50,32 @@ void setup()
 {
 	noInterrupts();
 	//Init pins
-    pinMode(CHANNEL_0_PIN,	INPUT);		// We don't want INPUT_PULLUP as the 5v may damage some receivers!
+    pinMode(CHANNEL_0_PIN,	INPUT);			// We don't want INPUT_PULLUP as the 5v may damage some receivers!
     attachInterrupt(0, readChannel0, CHANGE);
 
-	pinMode(SMOKE_PIN,		INPUT);		// We want to emulate the button so INPUT when not pressed and OUTPUT 0 when pressed
+	pinMode(SMOKE_PIN,		INPUT);			// We want to emulate the button so INPUT when not pressed and OUTPUT 0 when pressed
 	digitalWrite(SMOKE_PIN,	LOW);
 
-	pinMode(SMOKE_LED_PIN,	OUTPUT);	// Smoke LED
+	pinMode(SMOKE_LED_PIN,	OUTPUT);		// Smoke LED
 	SMOKE_LED_OFF;
 
-	pinMode(LED_PIN,		OUTPUT);	// Onboard LED
+	pinMode(LED_PIN,		OUTPUT);		// Onboard LED
 	LED_OFF;
 
 	// Setup timer 1
 	// Mode 0, Clock prescaler /8 => Increment every 0.5µs, rollover every 32.768ms @ 16Mhz Clock
 	TCCR1A = 0;
-	TCCR1B = 2 << CS10;					// CLK/8. 
+	TCCR1B = 2 << CS10;						// CLK/8
 	TCCR1C = 0;
-	OCR1A  = 0;							// Timer compare register.
-	TIFR1  = 0xff;						// Reset flags.
+	OCR1A  = 0;								// Timer compare register
+	TIFR1  = 0xff;							// Reset flags
 	TCNT1  = 1;
 
-	// Interrupt lockdown.
-	TIFR0  = 0xff;	// Reset flags.
-	TIMSK0 = 0;		// Turn off timer 0 interrupts ( micros() function etc ).
-	TIFR2  = 0xff;	// Reset flags.
-	TIMSK2 = 0;		// Turn off timer 2 interrupts.
+	// Interrupt lockdown
+	TIFR0  = 0xff;							// Reset flags
+	TIMSK0 = 0;								// Turn off timer 0 interrupts ( micros() function etc )
+	TIFR2  = 0xff;							// Reset flags
+	TIMSK2 = 0;								// Turn off timer 2 interrupts
 
 	interrupts();
 }
@@ -82,53 +85,53 @@ void setup()
 /****************************/
 void loop()
 {// Main
-	#define SMOKE_CH_TH 1650	// Above this value the smoke will be requested
+	#define SMOKE_CH_TH 1650				// Above this value in microseconds the smoke will be requested
 	static uint8_t tmr1_ovf_cnt=0;
 
 	//Check Channel
 	if(Channel0_Ok)
 	{// Data received from the RX
 		//Read channel 0
-		cli();					// Disable interrupts to read the 16 bits value
+		cli();								// Disable interrupts to read the 16 bits value
 		uint16_t value=Channel0_Value;
-		Channel0_Ok=false;		// Read done
-		sei();					// Enable interrupts
+		Channel0_Ok=false;					// Read done
+		sei();								// Enable interrupts
 
 		//Rquest smoke based on channel 0 value
 		smoke_request=value>SMOKE_CH_TH;
 
 		//Data is being received from the RX
-		LED_ON;					// Turn LED on
-		tmr1_ovf_cnt=0;			// Reset Timer 1 overflow counter
-		failsafe=false;			// Turn failsafe off
+		LED_ON;								// Turn LED on
+		tmr1_ovf_cnt=0;						// Reset Timer 1 overflow counter
+		failsafe=false;						// Turn failsafe off
 	}
 
 	//Failsafe check
 	if(TIFR1 & _BV(TOV1))
 	{// Timer 1 has an overflow
-		TIFR1 |= _BV(TOV1);		// Clear flag
-		tmr1_ovf_cnt++;			// Increment Timer 1 overflow counter
+		TIFR1 |= _BV(TOV1);					// Clear flag
+		tmr1_ovf_cnt++;						// Increment Timer 1 overflow counter
 		if(tmr1_ovf_cnt>3)
 		{	//If no data is received from the RX after 96ms activate failsafe
-			LED_TOGGLE;			// Blink LED every 96ms
-			failsafe=true;		// Set failsafe
-			tmr1_ovf_cnt=0;		// Reset Timer 1 overflow counter
+			LED_TOGGLE;						// Blink LED every 96ms
+			failsafe=true;					// Set failsafe
+			tmr1_ovf_cnt=0;					// Reset Timer 1 overflow counter
 
 			//Request to turn the smoke off
 			smoke_request=false;
 		}
 	}
 
-	Update_millisec();			// Keep track of time
+	Update_millisec();						// Keep track of time
 
-	Update_Smoke();				// Turn on/off smoke based on request
+	Update_Smoke();							// Turn on/off smoke based on request
 } // end of loop()
 
 //------ Generate smoke ------
 void Update_Smoke()
 {
-	#define SMOKE_MIN_MS 600			// Must be at least 600ms for the module to accept the command
-	#define SMOKE_BUTTON_RELEASE_MS 200	// Must be at least 200ms between press and release of the button
+	#define SMOKE_MIN_MS 600				// Must be at least 600ms for the module to accept the command
+	#define SMOKE_BUTTON_RELEASE_MS 200		// Must be at least 200ms between press and release of the button
 	static boolean smoke_state=false;
 	static uint16_t smoke_last_update=millisec;
 
@@ -137,7 +140,7 @@ void Update_Smoke()
 	{
 		if(smoke_state==false && millisec-smoke_last_update>=SMOKE_MIN_MS)	// Need to wait SMOKE_MIN_MS between each button press
 		{ // Press the button to start the smoke
-			DDRC |= _BV(0);	// C0 output	=0
+			DDRC |= _BV(0);					// C0 output	=0
 			smoke_state=true;
 			smoke_last_update=millisec;
 		}
@@ -146,14 +149,14 @@ void Update_Smoke()
 	{
 		if(smoke_state==true && millisec-smoke_last_update>=SMOKE_MIN_MS)	// Need to wait SMOKE_MIN_MS between each button press
 		{ // Press the button to stop the smoke
-			DDRC |= _BV(0);	// C0 output	=0
+			DDRC |= _BV(0);					// C0 output	=0
 			smoke_state=false;
 			smoke_last_update=millisec;
 		}
 	}
 	if(millisec-smoke_last_update>=SMOKE_BUTTON_RELEASE_MS)
 	{ // Release the button after SMOKE_BUTTON_RELEASE_MS it has been pressed
-		DDRC &= ~_BV(0);	// C0 input		=1
+		DDRC &= ~_BV(0);					// C0 input		=1
 	}
 
 	//Toggle the SMOKE LED with the smoke
