@@ -1,6 +1,10 @@
-/*****************************************************************/
-/**** Smoke Generator Code by Pascal Langer for Bateau Modele ****/
-/*****************************************************************/
+/************************************************************/
+/**** Smoke_Generator code pour Bateau modèle numéro 144 ****/
+/************************************************************/
+
+//!!!!!!!!!!!!!!!
+//!!!ATTENTION!!! Vous devez utiliser le schéma rectificatif paru dans le Bateau Modèle hors série 39 de Décembre 2018
+//!!!!!!!!!!!!!!!
 
 // ***********
 //  Validate
